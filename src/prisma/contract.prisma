@@ -1,0 +1,209 @@
+// use prisma-8
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum InvitationRole {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id             Uuid      @id @default(uuid())
+  email          String    @unique
+  name           String
+  passwordHash   String
+  avatarUrl      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      temporal.updatedAt()
+
+  memberships     Membership[]
+  createdProjects Project[]    @relation("ProjectCreator")
+  createdTasks    Task[]       @relation("TaskCreator")
+  assignedTasks   Task[]       @relation("TaskAssignee")
+  comments        Comment[]    @relation("CommentAuthor")
+  attachments     Attachment[] @relation("AttachmentUploader")
+  invitations     Invitation[] @relation("InvitationSender")
+  activities      Activity[]   @relation("ActivityActor")
+}
+
+model Workspace {
+  id           Uuid      @id @default(uuid())
+  name         String
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    temporal.updatedAt()
+
+  memberships  Membership[]
+  projects     Project[]
+  labels       Label[]
+  invitations  Invitation[]
+  activities   Activity[]
+}
+
+model Membership {
+  id           Uuid           @id @default(uuid())
+  userId       Uuid
+  workspaceId  Uuid
+  role         MembershipRole @default(MEMBER)
+  joinedAt     DateTime       @default(now())
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model Project {
+  id           Uuid          @id @default(uuid())
+  workspaceId  Uuid
+  createdById  Uuid
+  name         String
+  description  String?
+  status       ProjectStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    temporal.updatedAt()
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  tasks        Task[]
+
+  @@index([workspaceId, status])
+  @@index([createdById])
+}
+
+model Task {
+  id           Uuid         @id @default(uuid())
+  projectId    Uuid
+  createdById  Uuid
+  assigneeId   Uuid?
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    temporal.updatedAt()
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("TaskCreator", fields: [createdById], references: [id])
+  assignee     User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments     Comment[]
+  attachments  Attachment[]
+  taskLabels   TaskLabel[]
+
+  @@index([projectId, status])
+  @@index([assigneeId, status])
+  @@index([projectId, dueDate])
+}
+
+model Comment {
+  id           Uuid      @id @default(uuid())
+  taskId       Uuid
+  authorId     Uuid
+  content      String
+  createdAt    DateTime  @default(now())
+  updatedAt    temporal.updatedAt()
+
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author       User      @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+model Label {
+  id           Uuid      @id @default(uuid())
+  workspaceId  Uuid
+  name         String
+  color        String?
+  createdAt    DateTime  @default(now())
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  taskLabels   TaskLabel[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model TaskLabel {
+  taskId       Uuid
+  labelId      Uuid
+
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label        Label     @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@index([labelId])
+}
+
+model Attachment {
+  id            Uuid      @id @default(uuid())
+  taskId        Uuid
+  uploadedById  Uuid
+  fileName      String
+  storageKey    String    @unique
+  mimeType      String
+  sizeBytes     BigInt
+  createdAt     DateTime  @default(now())
+
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy    User      @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+model Invitation {
+  id            Uuid           @id @default(uuid())
+  workspaceId   Uuid
+  invitedById   Uuid
+  email         String
+  role          InvitationRole @default(MEMBER)
+  tokenHash     String         @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy     User           @relation("InvitationSender", fields: [invitedById], references: [id])
+
+  @@index([workspaceId, email])
+}
+
+model Activity {
+  id            Uuid      @id @default(uuid())
+  workspaceId   Uuid
+  actorId       Uuid?
+  action        String
+  entityType    String
+  entityId      Uuid
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor         User?     @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, entityType, entityId])
+}
