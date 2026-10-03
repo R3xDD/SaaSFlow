@@ -29,22 +29,22 @@ enum InvitationRole {
 }
 
 model User {
-  id             Uuid      @id @default(uuid())
-  email          String    @unique
-  name           String
-  passwordHash   String
-  avatarUrl      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      temporal.updatedAt()
+  id           Uuid      @id @default(uuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    temporal.updatedAt()
 
   memberships     Membership[]
-  createdProjects Project[]    @relation("ProjectCreator")
-  createdTasks    Task[]       @relation("TaskCreator")
-  assignedTasks   Task[]       @relation("TaskAssignee")
-  comments        Comment[]    @relation("CommentAuthor")
-  attachments     Attachment[] @relation("AttachmentUploader")
-  invitations     Invitation[] @relation("InvitationSender")
-  activities      Activity[]   @relation("ActivityActor")
+  createdProjects Project[]   @relation("ProjectCreator")
+  createdTasks    Task[]      @relation("TaskCreator")
+  assignedTasks   Task[]      @relation("TaskAssignee")
+  comments        Comment[]   @relation("CommentAuthor")
+  attachments    Attachment[] @relation("AttachmentUploader")
+  invitations    Invitation[] @relation("InvitationSender")
+  activities     Activity[]   @relation("ActivityActor")
 }
 
 model Workspace {
