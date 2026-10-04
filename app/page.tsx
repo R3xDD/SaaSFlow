@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="min-h-screen">
@@ -6,13 +8,13 @@ export default function Home() {
           <h1 className="text-xl font-bold">SaaSFlow</h1>
 
           <div className="flex gap-3">
-            <button className="rounded-md border px-4 py-2">
+            <Link className="rounded-md border px-4 py-2" href="/sign-in">
               Sign in
-            </button>
+            </Link>
 
-            <button className="rounded-md bg-black px-4 py-2 text-white">
+            <Link className="rounded-md bg-black px-4 py-2 text-white" href="/sign-up">
               Get started
-            </button>
+            </Link>
           </div>
         </div>
       </nav>
@@ -27,9 +29,9 @@ export default function Home() {
           and development workflows.
         </p>
 
-        <button className="mt-8 rounded-md bg-black px-6 py-3 text-white">
+        <Link className="mt-8 inline-block rounded-md bg-black px-6 py-3 text-white" href="/sign-up">
           Get started
-        </button>
+        </Link>
       </section>
     </main>
   );

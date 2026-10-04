@@ -9,10 +9,18 @@ async function main() {
     return;
   }
 
+  const authUserId = process.env["SEED_AUTH_USER_ID"];
+
+  if (!authUserId) {
+    throw new Error(
+      "SEED_AUTH_USER_ID must reference the existing Better Auth user for the seeded email.",
+    );
+  }
+
   const user = await db.orm.public.User.create({
+    authUserId,
     email: "youssef@saasflow.dev",
     name: "Youssef",
-    passwordHash: "demo-hash",
   });
 
   const workspace = await db.orm.public.Workspace.create({

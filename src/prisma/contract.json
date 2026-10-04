@@ -1255,6 +1255,13 @@
           },
           "User": {
             "fields": {
+              "authUserId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "avatarUrl": {
                 "nullable": true,
                 "type": {
@@ -1284,13 +1291,6 @@
                 }
               },
               "name": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "passwordHash": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -1429,6 +1429,9 @@
             },
             "storage": {
               "fields": {
+                "authUserId": {
+                  "column": "authUserId"
+                },
                 "avatarUrl": {
                   "column": "avatarUrl"
                 },
@@ -1443,9 +1446,6 @@
                 },
                 "name": {
                   "column": "name"
-                },
-                "passwordHash": {
-                  "column": "passwordHash"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -2708,6 +2708,11 @@
             },
             "User": {
               "columns": {
+                "authUserId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "avatarUrl": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -2737,11 +2742,6 @@
                   "nativeType": "text",
                   "nullable": false
                 },
-                "passwordHash": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
@@ -2756,6 +2756,11 @@
                 ]
               },
               "uniques": [
+                {
+                  "columns": [
+                    "authUserId"
+                  ]
+                },
                 {
                   "columns": [
                     "email"
@@ -2850,7 +2855,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6879ad2b912cc756bfd90df085c7363ffa05ab344f11565a591c8bcdae36c332"
+    "storageHash": "07186828686cf95663bae27354649d403aee3d4f5135743bf962ce7d95ef5587"
   },
   "execution": {
     "executionHash": "109aa35aecd526b5753a3fa42f72b52acdc7454ed5ba709d3fb72685d9de37f6",

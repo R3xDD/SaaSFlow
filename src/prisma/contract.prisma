@@ -29,11 +29,11 @@ enum InvitationRole {
 }
 
 model User {
-  id           Uuid      @id @default(uuid())
-  email        String    @unique
-  name         String
-  passwordHash String
-  avatarUrl    String?
+  id             Uuid      @id @default(uuid())
+  authUserId     String    @unique
+  email          String    @unique
+  name           String
+  avatarUrl      String?
   createdAt    DateTime  @default(now())
   updatedAt    temporal.updatedAt()
 
