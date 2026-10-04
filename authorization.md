@@ -34,6 +34,13 @@ ID, project ID, or role must not be trusted for authorization.
 - `createProject()` derives the creator from the authenticated session and
   requires `project:create` permission.
 - `getProjectsWithTasks()` requires workspace access before querying projects.
+- `requireProjectPermission()` resolves a project to its workspace before
+        granting project access.
+- `requireTaskPermission()` resolves a task through its project and workspace.
+- `createTask()` derives the creator from the authenticated session and checks
+        the assignee belongs to the same workspace.
+- `getProjectTasks()` and `getTask()` require project/workspace access.
+- `createComment()` and `getTaskComments()` authorize through the task chain.
 
 The role model is already defined by the database contract:
 
@@ -56,9 +63,11 @@ Current project permissions are:
 
 ## Remaining Phase 5 work
 
-Task, comment, invitation, label, attachment, and activity mutations still
-need server-side authorization at the point where those operations are added.
-Each operation must verify the workspace boundary through its resource chain.
+Invitation, label, attachment, and activity mutations still need
+server-side authorization at the point where those operations are added.
+Member-management mutations and role changes also need routes or server
+actions before they can be protected end to end. Each operation must verify
+the workspace boundary through its resource chain.
 
 For example, task access must verify:
 
@@ -79,8 +88,10 @@ npx tsc --noEmit
 npx eslint lib/data/authorization.ts lib/data/errors.ts lib/data/workspaces.ts lib/data/projects.ts
 npx prisma migration status
 npx prisma db verify
+npm run check:authorization
 ```
 
-Authorization tests should cover unauthenticated access, non-membership,
-role boundaries, and cross-workspace project/task access before Phase 5 is
-declared complete.
+The repository currently has no unit-test runner. `check:authorization` is a
+read-only integration check for membership allow/deny behavior. A future test
+runner should cover unauthenticated access, role boundaries, and cross-workspace
+project/task access before production release.

@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "../../src/prisma/db";
 import { withDatabaseError } from "./database";
-import { ForbiddenError } from "./errors";
+import { ForbiddenError, NotFoundError } from "./errors";
 
 export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -11,6 +11,11 @@ export type WorkspacePermission =
   | "project:create"
   | "project:update"
   | "project:delete"
+  | "task:create"
+  | "task:update"
+  | "task:delete"
+  | "comment:create"
+  | "comment:delete"
   | "member:manage"
   | "role:change";
 
@@ -19,6 +24,11 @@ const permissionRoles: Record<WorkspacePermission, readonly WorkspaceRole[]> = {
   "project:create": ["OWNER", "ADMIN", "MEMBER"],
   "project:update": ["OWNER", "ADMIN", "MEMBER"],
   "project:delete": ["OWNER", "ADMIN"],
+  "task:create": ["OWNER", "ADMIN", "MEMBER"],
+  "task:update": ["OWNER", "ADMIN", "MEMBER"],
+  "task:delete": ["OWNER", "ADMIN"],
+  "comment:create": ["OWNER", "ADMIN", "MEMBER"],
+  "comment:delete": ["OWNER", "ADMIN"],
   "member:manage": ["OWNER", "ADMIN"],
   "role:change": ["OWNER"],
 };
@@ -37,6 +47,61 @@ export async function requireWorkspaceMembership(
   }
 
   return membership;
+}
+
+export async function requireProjectPermission(
+  userId: string,
+  projectId: string,
+  permission: WorkspacePermission,
+) {
+  const project = await withDatabaseError(
+    () => db.orm.public.Project.first({ id: projectId }),
+    `get project ${projectId}`,
+  );
+
+  if (!project) {
+    throw new NotFoundError("Project", projectId);
+  }
+
+  const membership = await requireWorkspacePermission(
+    userId,
+    project.workspaceId,
+    permission,
+  );
+
+  return { membership, project };
+}
+
+export async function requireTaskPermission(
+  userId: string,
+  taskId: string,
+  permission: WorkspacePermission,
+) {
+  const task = await withDatabaseError(
+    () => db.orm.public.Task.first({ id: taskId }),
+    `get task ${taskId}`,
+  );
+
+  if (!task) {
+    throw new NotFoundError("Task", taskId);
+  }
+
+  const project = await withDatabaseError(
+    () => db.orm.public.Project.first({ id: task.projectId }),
+    `get task project ${task.projectId}`,
+  );
+
+  if (!project) {
+    throw new NotFoundError("Project", task.projectId);
+  }
+
+  const membership = await requireWorkspacePermission(
+    userId,
+    project.workspaceId,
+    permission,
+  );
+
+  return { membership, project, task };
 }
 
 export async function requireWorkspacePermission(
