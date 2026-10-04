@@ -1,12 +1,17 @@
+import "server-only";
+
+import { requireApplicationUser } from "../../src/auth/session";
 import { db } from "../../src/prisma/db";
+import { requireWorkspacePermission } from "./authorization";
 import { NotFoundError } from "./errors";
 import { withDatabaseError } from "./database";
 
 export async function createWorkspace(
   name: string,
-  ownerId: string,
   description?: string,
 ) {
+  const { user } = await requireApplicationUser();
+
   return withDatabaseError(
     () =>
       db.transaction(async (tx) => {
@@ -16,7 +21,7 @@ export async function createWorkspace(
         });
 
         await tx.orm.public.Membership.create({
-          userId: ownerId,
+          userId: user.id,
           workspaceId: workspace.id,
           role: "OWNER",
         });
@@ -27,7 +32,7 @@ export async function createWorkspace(
   );
 }
 
-export async function getWorkspace(id: string) {
+async function getWorkspaceRecord(id: string) {
   const workspace = await withDatabaseError(
     () => db.orm.public.Workspace.first({ id }),
     `get workspace ${id}`,
@@ -38,4 +43,11 @@ export async function getWorkspace(id: string) {
   }
 
   return workspace;
+}
+
+export async function getWorkspace(workspaceId: string) {
+  const { user } = await requireApplicationUser();
+  await requireWorkspacePermission(user.id, workspaceId, "workspace:view");
+
+  return getWorkspaceRecord(workspaceId);
 }
