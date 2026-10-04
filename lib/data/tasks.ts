@@ -16,8 +16,18 @@ export async function createTask(
   assigneeId?: string,
 ) {
   const { user } = await requireApplicationUser();
+  return createTaskForUser(user.id, projectId, title, description, assigneeId);
+}
+
+export async function createTaskForUser(
+  userId: string,
+  projectId: string,
+  title: string,
+  description?: string,
+  assigneeId?: string,
+) {
   const { project } = await requireProjectPermission(
-    user.id,
+    userId,
     projectId,
     "task:create",
   );
@@ -30,7 +40,7 @@ export async function createTask(
     () =>
       db.orm.public.Task.create({
         projectId,
-        createdById: user.id,
+        createdById: userId,
         ...(assigneeId !== undefined ? { assigneeId } : {}),
         title,
         ...(description !== undefined ? { description } : {}),
@@ -41,7 +51,11 @@ export async function createTask(
 
 export async function getProjectTasks(projectId: string) {
   const { user } = await requireApplicationUser();
-  await requireProjectPermission(user.id, projectId, "workspace:view");
+  return getProjectTasksForUser(user.id, projectId);
+}
+
+export async function getProjectTasksForUser(userId: string, projectId: string) {
+  await requireProjectPermission(userId, projectId, "workspace:view");
 
   return withDatabaseError(
     () => Array.fromAsync(db.orm.public.Task.where({ projectId }).all()),
@@ -58,4 +72,36 @@ export async function getTask(taskId: string) {
   );
 
   return task;
+}
+
+export async function updateTaskForUser(
+  userId: string,
+  taskId: string,
+  data: {
+    title?: string;
+    description?: string;
+    status?: "TODO" | "IN_PROGRESS" | "DONE";
+    priority?: "LOW" | "MEDIUM" | "HIGH";
+    assigneeId?: string | null;
+  },
+) {
+  const { project } = await requireTaskPermission(userId, taskId, "task:update");
+
+  if (data.assigneeId !== undefined && data.assigneeId !== null) {
+    await requireWorkspaceMembership(data.assigneeId, project.workspaceId);
+  }
+
+  return withDatabaseError(
+    () => db.orm.public.Task.where({ id: taskId }).update(data),
+    `update task ${taskId}`,
+  );
+}
+
+export async function deleteTaskForUser(userId: string, taskId: string) {
+  await requireTaskPermission(userId, taskId, "task:delete");
+
+  return withDatabaseError(
+    () => db.orm.public.Task.where({ id: taskId }).delete(),
+    `delete task ${taskId}`,
+  );
 }

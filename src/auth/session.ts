@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "../prisma/db";
 import { auth } from "./auth";
+import { UnauthorizedError } from "../../lib/data/errors";
 
 export async function getSession() {
   return auth.api.getSession({ headers: await headers() });
@@ -27,6 +28,24 @@ export async function requireApplicationUser() {
 
   if (!user) {
     throw new Error("Authenticated user is missing its SaaSFlow user record.");
+  }
+
+  return { session, user };
+}
+
+export async function requireApiApplicationUser() {
+  const session = await getSession();
+
+  if (!session) {
+    throw new UnauthorizedError();
+  }
+
+  const user = await db.orm.public.User.first({
+    authUserId: session.user.id,
+  });
+
+  if (!user) {
+    throw new UnauthorizedError("Authenticated application user was not found.");
   }
 
   return { session, user };

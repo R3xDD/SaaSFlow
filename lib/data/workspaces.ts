@@ -11,6 +11,14 @@ export async function createWorkspace(
   description?: string,
 ) {
   const { user } = await requireApplicationUser();
+  return createWorkspaceForUser(user.id, name, description);
+}
+
+export async function createWorkspaceForUser(
+  userId: string,
+  name: string,
+  description?: string,
+) {
 
   return withDatabaseError(
     () =>
@@ -21,7 +29,7 @@ export async function createWorkspace(
         });
 
         await tx.orm.public.Membership.create({
-          userId: user.id,
+          userId,
           workspaceId: workspace.id,
           role: "OWNER",
         });
@@ -50,4 +58,26 @@ export async function getWorkspace(workspaceId: string) {
   await requireWorkspacePermission(user.id, workspaceId, "workspace:view");
 
   return getWorkspaceRecord(workspaceId);
+}
+
+export async function updateWorkspaceForUser(
+  userId: string,
+  workspaceId: string,
+  data: { name?: string; description?: string },
+) {
+  await requireWorkspacePermission(userId, workspaceId, "workspace:update");
+
+  return withDatabaseError(
+    () => db.orm.public.Workspace.where({ id: workspaceId }).update(data),
+    `update workspace ${workspaceId}`,
+  );
+}
+
+export async function deleteWorkspaceForUser(userId: string, workspaceId: string) {
+  await requireWorkspacePermission(userId, workspaceId, "workspace:delete");
+
+  return withDatabaseError(
+    () => db.orm.public.Workspace.where({ id: workspaceId }).delete(),
+    `delete workspace ${workspaceId}`,
+  );
 }

@@ -72,6 +72,61 @@ Response
 Browser
 ```
 
+## 3.1 Server Operations
+
+Domain mutations use Next.js Route Handlers under `app/api` and follow this
+server-side order:
+
+```text
+Request JSON
+        |
+        v
+Input validation and normalization
+        |
+        v
+Better Auth session resolution
+        |
+        v
+Workspace membership and permission checks
+        |
+        v
+Business operation orchestration
+        |
+        v
+Data access layer
+        |
+        v
+PostgreSQL
+        |
+        v
+Safe JSON response
+```
+
+Current server-operation endpoints are:
+
+- `POST /api/workspaces`
+- `PATCH /api/workspaces/:workspaceId`
+- `DELETE /api/workspaces/:workspaceId`
+- `GET /api/workspaces/:workspaceId/members`
+- `PATCH /api/workspaces/:workspaceId/members`
+- `DELETE /api/workspaces/:workspaceId/members`
+- `GET /api/projects?workspaceId=...`
+- `POST /api/projects`
+- `PATCH /api/projects/:projectId`
+- `DELETE /api/projects/:projectId`
+- `GET /api/tasks?projectId=...`
+- `POST /api/tasks`
+- `PATCH /api/tasks/:taskId`
+- `DELETE /api/tasks/:taskId`
+- `POST /api/comments`
+- `DELETE /api/comments/:commentId`
+
+The route handlers own request parsing and safe error responses. Server
+operations own validation, session resolution, authorization orchestration,
+and calls to the data layer. The data layer owns PostgreSQL persistence and
+workspace/resource queries. Client-provided user IDs are never used to set
+resource ownership.
+
 ## 4. Main Components
 
 ### Browser / UI

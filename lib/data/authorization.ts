@@ -8,6 +8,8 @@ export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
 export type WorkspacePermission =
   | "workspace:view"
+  | "workspace:update"
+  | "workspace:delete"
   | "project:create"
   | "project:update"
   | "project:delete"
@@ -21,6 +23,8 @@ export type WorkspacePermission =
 
 const permissionRoles: Record<WorkspacePermission, readonly WorkspaceRole[]> = {
   "workspace:view": ["OWNER", "ADMIN", "MEMBER"],
+  "workspace:update": ["OWNER", "ADMIN"],
+  "workspace:delete": ["OWNER"],
   "project:create": ["OWNER", "ADMIN", "MEMBER"],
   "project:update": ["OWNER", "ADMIN", "MEMBER"],
   "project:delete": ["OWNER", "ADMIN"],
@@ -102,6 +106,25 @@ export async function requireTaskPermission(
   );
 
   return { membership, project, task };
+}
+
+export async function requireCommentPermission(
+  userId: string,
+  commentId: string,
+  permission: WorkspacePermission,
+) {
+  const comment = await withDatabaseError(
+    () => db.orm.public.Comment.first({ id: commentId }),
+    `get comment ${commentId}`,
+  );
+
+  if (!comment) {
+    throw new NotFoundError("Comment", commentId);
+  }
+
+  const result = await requireTaskPermission(userId, comment.taskId, permission);
+
+  return { ...result, comment };
 }
 
 export async function requireWorkspacePermission(

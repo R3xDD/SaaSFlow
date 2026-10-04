@@ -1,0 +1,10 @@
+import { errorResponse } from "@/lib/server/http";
+import { createWorkspaceOperation } from "@/lib/server/workspaces";
+
+export async function POST(request: Request) {
+  try {
+    return Response.json(await createWorkspaceOperation(await request.json()), { status: 201 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

@@ -10,7 +10,8 @@
     "lint": "eslint",
     "contract:emit": "prisma contract emit",
     "seed": "tsx src/prisma/seed.ts",
-    "check:authorization": "tsx scripts/check-authorization.ts"
+    "check:authorization": "tsx scripts/check-authorization.ts",
+    "check:server-operations": "tsx scripts/check-server-operations.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
