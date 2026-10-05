@@ -1,7 +1,12 @@
 import "server-only";
 
 import { requireApiApplicationUser } from "../../src/auth/session";
-import { createWorkspaceForUser, deleteWorkspaceForUser, updateWorkspaceForUser } from "../data/workspaces";
+import {
+  createWorkspaceForUser,
+  deleteWorkspaceForUser,
+  listWorkspacesForUser,
+  updateWorkspaceForUser,
+} from "../data/workspaces";
 import { parseCreateWorkspaceInput, parseResourceIdInput, parseUpdateWorkspaceInput } from "./validation";
 
 export async function createWorkspaceOperation(input: unknown) {
@@ -29,4 +34,11 @@ export async function deleteWorkspaceOperation(input: unknown) {
   await deleteWorkspaceForUser(user.id, workspaceId);
 
   return { success: true as const, data: { id: workspaceId } };
+}
+
+export async function listWorkspacesOperation() {
+  const { user } = await requireApiApplicationUser();
+  const workspaces = await listWorkspacesForUser(user.id);
+
+  return { success: true as const, data: workspaces };
 }

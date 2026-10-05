@@ -60,6 +60,18 @@ export async function getWorkspace(workspaceId: string) {
   return getWorkspaceRecord(workspaceId);
 }
 
+export async function listWorkspacesForUser(userId: string) {
+  const memberships = await withDatabaseError(
+    () => Array.fromAsync(db.orm.public.Membership.where({ userId }).all()),
+    `list workspaces for user ${userId}`,
+  );
+
+  return withDatabaseError(
+    () => Promise.all(memberships.map(({ workspaceId }) => getWorkspaceRecord(workspaceId))),
+    `load workspaces for user ${userId}`,
+  );
+}
+
 export async function updateWorkspaceForUser(
   userId: string,
   workspaceId: string,

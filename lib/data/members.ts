@@ -9,7 +9,7 @@ export async function listWorkspaceMembersForUser(userId: string, workspaceId: s
   await requireWorkspacePermission(userId, workspaceId, "workspace:view");
 
   return withDatabaseError(
-    () => Array.fromAsync(db.orm.public.Membership.where({ workspaceId }).all()),
+    () => Array.fromAsync(db.orm.public.Membership.where({ workspaceId }).include("user").all()),
     `list members for workspace ${workspaceId}`,
   );
 }
