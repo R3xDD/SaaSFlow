@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { errorResponse } from "@/lib/server/http";
 import { changeMemberRoleOperation, listMembersOperation, removeMemberOperation } from "@/lib/server/members";
 
@@ -15,7 +16,9 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { workspaceId } = await context.params;
-    return Response.json(await changeMemberRoleOperation({ ...(await request.json()), workspaceId }));
+    const result = await changeMemberRoleOperation({ ...(await request.json()), workspaceId });
+    revalidatePath("/dashboard");
+    return Response.json(result);
   } catch (error) {
     return errorResponse(error);
   }
@@ -24,7 +27,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   try {
     const { workspaceId } = await context.params;
-    return Response.json(await removeMemberOperation({ ...(await request.json()), workspaceId }));
+    const result = await removeMemberOperation({ ...(await request.json()), workspaceId });
+    revalidatePath("/dashboard");
+    return Response.json(result);
   } catch (error) {
     return errorResponse(error);
   }

@@ -1,7 +1,8 @@
 "use client";
 
 import { Activity, ArrowUpRight, Check, CircleAlert, FolderKanban, ListTodo, Plus, Sparkles, Trash2 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MembersView } from "@/components/dashboard/members-view";
@@ -14,87 +15,49 @@ type Task = { id: string; projectId?: string; title: string; description?: strin
 type Project = { id: string; name: string; description?: string | null; status: "ACTIVE" | "ARCHIVED"; tasks?: Task[] };
 type Section = "home" | "projects" | "tasks" | "members" | "settings";
 
-export function DashboardApp({ user }: { user: { name: string; email: string } }) {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [section, setSection] = useState<Section>("home");
-  const [loading, setLoading] = useState(true);
+export function DashboardApp({
+  user,
+  workspaces,
+  projects,
+  initialWorkspaceId,
+  initialSection,
+}: {
+  user: { name: string; email: string };
+  workspaces: Workspace[];
+  projects: Project[];
+  initialWorkspaceId: string | null;
+  initialSection: Section;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const workspaceId = workspaces.some((workspace) => workspace.id === initialWorkspaceId)
+    ? initialWorkspaceId
+    : workspaces[0]?.id ?? null;
+  const section = initialSection;
   const [error, setError] = useState<string | null>(null);
   const [showWorkspaceForm, setShowWorkspaceForm] = useState(false);
   const [workspacePending, setWorkspacePending] = useState(false);
-  const [workspaceChanging, setWorkspaceChanging] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | undefined>();
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [deleteRequest, setDeleteRequest] = useState<{ kind: "project" | "task"; id: string; label: string } | null>(null);
-  const skipWorkspaceFetch = useRef(true);
 
-  async function loadWorkspaces() {
-    setError(null);
-    const response = await fetch("/api/workspaces", { cache: "no-store" });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error?.message ?? "Unable to load workspaces.");
-    setWorkspaces(result.data);
-    setWorkspaceId((current) => current && result.data.some((item: Workspace) => item.id === current) ? current : result.data[0]?.id ?? null);
-    return result.data as Workspace[];
-  }
+  function updateQuery(next: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
 
-  async function loadProjects(selectedWorkspaceId: string | null) {
-    if (!selectedWorkspaceId) { setProjects([]); return; }
-    const response = await fetch(`/api/projects?workspaceId=${selectedWorkspaceId}`, { cache: "no-store" });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error?.message ?? "Unable to load projects.");
-    setProjects(result.data);
-  }
-
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const response = await fetch("/api/workspaces", { cache: "no-store" });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message ?? "Unable to load workspaces.");
-        const items = result.data as Workspace[];
-        if (!active) return;
-        setWorkspaces(items);
-        const initialWorkspaceId = items[0]?.id ?? null;
-        setWorkspaceId(initialWorkspaceId);
-        if (initialWorkspaceId) {
-          const projectResponse = await fetch(`/api/projects?workspaceId=${initialWorkspaceId}`, { cache: "no-store" });
-          const projectResult = await projectResponse.json();
-          if (!projectResponse.ok) throw new Error(projectResult.error?.message ?? "Unable to load projects.");
-          if (active) setProjects(projectResult.data);
-        }
-      } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Unable to load your workspace.");
-      } finally {
-        if (active) setLoading(false);
+    for (const [key, value] of Object.entries(next)) {
+      if (value === null || value === "") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
       }
-    })();
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceId || loading) return;
-    if (skipWorkspaceFetch.current) {
-      skipWorkspaceFetch.current = false;
-      return;
     }
-    let active = true;
-    setWorkspaceChanging(true);
-    void (async () => {
-      try {
-        await loadProjects(workspaceId);
-      } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Unable to load projects.");
-      } finally {
-        if (active) setWorkspaceChanging(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [workspaceId, loading]);
+
+    const target = params.size > 0 ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(target, { scroll: false });
+  }
 
   const tasks = useMemo(() => projects.flatMap((project) => project.tasks ?? []), [projects]);
   const completed = tasks.filter((task) => task.status === "DONE").length;
@@ -104,62 +67,107 @@ export function DashboardApp({ user }: { user: { name: string; email: string } }
     event.preventDefault();
     setWorkspacePending(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description") || undefined }) });
+    const response = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.get("name"),
+        description: form.get("description") || undefined,
+      }),
+    });
     const result = await response.json();
-    if (!response.ok) { setWorkspacePending(false); setError(result.error?.message ?? "Unable to create workspace."); return; }
+
+    if (!response.ok) {
+      setWorkspacePending(false);
+      setError(result.error?.message ?? "Unable to create workspace.");
+      return;
+    }
+
     setShowWorkspaceForm(false);
     setWorkspacePending(false);
     event.currentTarget.reset();
-    const items = await loadWorkspaces();
-    setWorkspaceId(result.data.id ?? items[0]?.id ?? null);
+    const nextWorkspaceId = String(result.data?.id ?? workspaces[0]?.id ?? "");
+    updateQuery({ workspaceId: nextWorkspaceId || null, section: "home" });
+    router.refresh();
     toast.success(String(form.get("name")), { description: "Workspace created successfully." });
   }
 
   async function deleteProject(projectId: string, projectName?: string) {
     const response = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
-    if (!response.ok) { const result = await response.json(); setError(result.error?.message ?? "Unable to delete project."); return; }
-    await loadProjects(workspaceId);
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error?.message ?? "Unable to delete project.");
+      return;
+    }
+
+    router.refresh();
     toast.error(projectName ?? "Project deleted", { description: "Project deleted." });
   }
 
   async function deleteTask(taskId: string, taskName?: string) {
     const response = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-    if (!response.ok) { const result = await response.json(); setError(result.error?.message ?? "Unable to delete task."); return; }
-    await loadProjects(workspaceId);
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error?.message ?? "Unable to delete task.");
+      return;
+    }
+
+    router.refresh();
     toast.error(taskName ?? "Task deleted", { description: "Task deleted." });
   }
 
   async function refreshWorkspace() {
-    await loadWorkspaces();
+    router.refresh();
   }
 
   async function deleteWorkspace(workspaceToDeleteId: string, workspaceName?: string) {
     const response = await fetch(`/api/workspaces/${workspaceToDeleteId}`, { method: "DELETE" });
-    if (!response.ok) { const result = await response.json(); setError(result.error?.message ?? "Unable to delete workspace."); return; }
-    setSection("home");
-    await loadWorkspaces();
+    if (!response.ok) {
+      const result = await response.json();
+      setError(result.error?.message ?? "Unable to delete workspace.");
+      return;
+    }
+
+    const nextWorkspaceId = workspaces.find((workspace) => workspace.id !== workspaceToDeleteId)?.id ?? null;
+    updateQuery({ workspaceId: nextWorkspaceId, section: "home" });
+    router.refresh();
     toast.error(workspaceName ?? "Workspace deleted", { description: "Workspace deleted." });
   }
 
-  return <AppShell user={user} workspaces={workspaces} workspaceId={workspaceId} activeSection={section} onSectionChange={setSection} onWorkspaceChange={(nextWorkspaceId) => { const nextWorkspace = workspaces.find((workspace) => workspace.id === nextWorkspaceId); setSection("home"); setWorkspaceChanging(true); setWorkspaceId(nextWorkspaceId); toast.success(`Switched to ${nextWorkspace?.name ?? "workspace"}`, { description: "Loading workspace activity..." }); }}>
-    <div className="mx-auto max-w-[1440px] px-5 pb-24 pt-7 sm:px-8 lg:px-10 lg:pt-10">
-      <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--saas-blue)]">{selectedWorkspace?.name ?? "Your workspace"}</p><h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--saas-navy)] sm:text-4xl">Good morning, {user.name.split(" ")[0]}.</h1><p className="mt-2 text-sm text-slate-500">Here&apos;s what is happening with your development work.</p></div><button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--saas-blue)] px-4 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-[var(--saas-blue-dark)] disabled:opacity-40" disabled={!workspaceId} onClick={() => setShowProjectForm(true)} type="button"><Plus size={17} />New project</button></div>
-      {error ? <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><CircleAlert size={17} />{error}<button className="ml-auto font-bold" onClick={() => setError(null)} type="button">Dismiss</button></div> : null}
-      {loading || workspaceChanging ? <LoadingState /> : !workspaces.length ? <WorkspaceEmpty onCreate={() => setShowWorkspaceForm(true)} /> : <>
-        <div className="saas-view-enter" key={`${workspaceId}-${section}`}>
-          {section === "home" ? <Overview projects={projects} tasks={tasks} completed={completed} onProjects={() => setSection("projects")} onTasks={() => setSection("tasks")} /> : null}
-          {section === "projects" ? <ProjectsView projects={projects} onCreate={() => { setEditingProject(undefined); setShowProjectForm(true); }} onEdit={(project) => { setEditingProject(project); setShowProjectForm(true); }} onDelete={(id) => { const project = projects.find((item) => item.id === id); setDeleteRequest({ kind: "project", id, label: project?.name ?? "this project" }); }} /> : null}
-          {section === "tasks" ? <TasksView tasks={tasks} projects={projects} onCreate={() => { setEditingTask(undefined); setShowTaskForm(true); }} onEdit={setEditingTask} onDelete={(id) => { const task = tasks.find((item) => item.id === id); setDeleteRequest({ kind: "task", id, label: task?.title ?? "this task" }); }} /> : null}
-          {section === "members" && workspaceId ? <MembersView workspaceId={workspaceId} /> : null}
-          {section === "settings" && selectedWorkspace ? <WorkspaceSettings workspace={selectedWorkspace} onSaved={refreshWorkspace} onDeleted={() => deleteWorkspace(selectedWorkspace.id, selectedWorkspace.name)} /> : null}
-        </div>
-      </>}
-    </div>
-    {showWorkspaceForm ? <Modal title="Create a workspace" onClose={() => { if (!workspacePending) setShowWorkspaceForm(false); }}><form className="space-y-4" onSubmit={createWorkspace}><Field label="Workspace name" name="name" placeholder="e.g. Acme Studio" required /><Field label="Description" name="description" placeholder="What is this workspace for?" /><ModalActions onCancel={() => setShowWorkspaceForm(false)} pending={workspacePending} submit="Create workspace" /></form></Modal> : null}
-    {showProjectForm && workspaceId ? <ProjectDialog project={editingProject} workspaceId={workspaceId} onClose={() => setShowProjectForm(false)} onSaved={() => loadProjects(workspaceId)} /> : null}
-    {showTaskForm ? <TaskDialog task={editingTask} projects={projects} onClose={() => setShowTaskForm(false)} onSaved={() => loadProjects(workspaceId)} /> : null}
-    {deleteRequest ? <ConfirmDeleteModal request={deleteRequest} onCancel={() => setDeleteRequest(null)} onConfirm={async () => { const request = deleteRequest; setDeleteRequest(null); if (request.kind === "project") await deleteProject(request.id, request.label); else await deleteTask(request.id, request.label); }} /> : null}
-  </AppShell>;
+  return (
+    <AppShell
+      activeSection={section}
+      onSectionChange={(nextSection) => {
+        updateQuery({ section: nextSection });
+      }}
+      onWorkspaceChange={(nextWorkspaceId) => {
+        const nextWorkspace = workspaces.find((workspace) => workspace.id === nextWorkspaceId);
+        updateQuery({ workspaceId: nextWorkspaceId, section: "home" });
+        toast.success(`Switched to ${nextWorkspace?.name ?? "workspace"}`, { description: "Loading workspace activity..." });
+      }}
+      user={user}
+      workspaces={workspaces}
+      workspaceId={workspaceId}
+    >
+      <div className="mx-auto max-w-[1440px] px-5 pb-24 pt-7 sm:px-8 lg:px-10 lg:pt-10">
+        <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--saas-blue)]">{selectedWorkspace?.name ?? "Your workspace"}</p><h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--saas-navy)] sm:text-4xl">Good morning, {user.name.split(" ")[0]}.</h1><p className="mt-2 text-sm text-slate-500">Here&apos;s what is happening with your development work.</p></div><button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--saas-blue)] px-4 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-[var(--saas-blue-dark)] disabled:opacity-40" disabled={!workspaceId} onClick={() => setShowProjectForm(true)} type="button"><Plus size={17} />New project</button></div>
+        {error ? <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><CircleAlert size={17} />{error}<button className="ml-auto font-bold" onClick={() => setError(null)} type="button">Dismiss</button></div> : null}
+        {!workspaces.length ? <WorkspaceEmpty onCreate={() => setShowWorkspaceForm(true)} /> : <>
+          <div className="saas-view-enter" key={`${workspaceId}-${section}`}>
+            {section === "home" ? <Overview projects={projects} tasks={tasks} completed={completed} onProjects={() => updateQuery({ section: "projects" })} onTasks={() => updateQuery({ section: "tasks" })} /> : null}
+            {section === "projects" ? <ProjectsView projects={projects} onCreate={() => { setEditingProject(undefined); setShowProjectForm(true); }} onEdit={(project) => { setEditingProject(project); setShowProjectForm(true); }} onDelete={(id) => { const project = projects.find((item) => item.id === id); setDeleteRequest({ kind: "project", id, label: project?.name ?? "this project" }); }} /> : null}
+            {section === "tasks" ? <TasksView tasks={tasks} projects={projects} onCreate={() => { setEditingTask(undefined); setShowTaskForm(true); }} onEdit={setEditingTask} onDelete={(id) => { const task = tasks.find((item) => item.id === id); setDeleteRequest({ kind: "task", id, label: task?.title ?? "this task" }); }} /> : null}
+            {section === "members" && workspaceId ? <MembersView workspaceId={workspaceId} /> : null}
+            {section === "settings" && selectedWorkspace ? <WorkspaceSettings workspace={selectedWorkspace} onSaved={refreshWorkspace} onDeleted={() => deleteWorkspace(selectedWorkspace.id, selectedWorkspace.name)} /> : null}
+          </div>
+        </>}
+      </div>
+      {showWorkspaceForm ? <Modal title="Create a workspace" onClose={() => { if (!workspacePending) setShowWorkspaceForm(false); }}><form className="space-y-4" onSubmit={createWorkspace}><Field label="Workspace name" name="name" placeholder="e.g. Acme Studio" required /><Field label="Description" name="description" placeholder="What is this workspace for?" /><ModalActions onCancel={() => setShowWorkspaceForm(false)} pending={workspacePending} submit="Create workspace" /></form></Modal> : null}
+      {showProjectForm && workspaceId ? <ProjectDialog project={editingProject} workspaceId={workspaceId} onClose={() => setShowProjectForm(false)} onSaved={async () => { router.refresh(); }} /> : null}
+      {showTaskForm ? <TaskDialog task={editingTask} projects={projects} onClose={() => setShowTaskForm(false)} onSaved={async () => { router.refresh(); }} /> : null}
+      {deleteRequest ? <ConfirmDeleteModal request={deleteRequest} onCancel={() => setDeleteRequest(null)} onConfirm={async () => { const request = deleteRequest; setDeleteRequest(null); if (request.kind === "project") await deleteProject(request.id, request.label); else await deleteTask(request.id, request.label); }} /> : null}
+    </AppShell>
+  );
 }
 
 function Overview({ projects, tasks, completed, onProjects, onTasks }: { projects: Project[]; tasks: Task[]; completed: number; onProjects: () => void; onTasks: () => void }) {
@@ -171,7 +179,6 @@ function ProjectsView({ projects, onCreate, onEdit, onDelete }: { projects: Proj
 
 function TasksView({ tasks, projects, onCreate, onEdit, onDelete }: { tasks: Task[]; projects: Project[]; onCreate: () => void; onEdit: (task: Task) => void; onDelete: (id: string) => void }) { return <section><div className="mb-6 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--saas-blue)]">Work queue</p><h2 className="mt-1 text-2xl font-bold text-[var(--saas-navy)]">Tasks</h2></div><button className="inline-flex items-center gap-2 rounded-xl bg-[var(--saas-blue)] px-4 py-2.5 text-sm font-bold text-white" onClick={onCreate} type="button"><Plus size={16} />New task</button></div>{tasks.length ? <div className="overflow-hidden rounded-2xl border border-[var(--saas-line)] bg-white shadow-[0_12px_32px_rgba(31,41,79,0.04)]"><div className="hidden grid-cols-[1fr_140px_120px_80px] border-b border-[var(--saas-line)] px-5 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 sm:grid"><span>Task</span><span>Status</span><span>Priority</span><span /></div>{tasks.map((task) => <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--saas-line)] px-5 py-4 last:border-0 sm:grid-cols-[1fr_140px_120px_80px]" key={task.id}><button className="min-w-0 text-left" onClick={() => onEdit(task)} type="button"><p className="truncate text-sm font-bold text-[var(--saas-navy)]">{task.title}</p><p className="mt-1 truncate text-xs text-slate-400">{projects.find((project) => project.tasks?.some((item) => item.id === task.id))?.name ?? "Project"}</p></button><span className="text-xs font-semibold text-slate-500">{task.status.replace("_", " ").toLowerCase()}</span><span className={`text-xs font-bold ${task.priority === "HIGH" ? "text-red-500" : task.priority === "MEDIUM" ? "text-orange-500" : "text-slate-400"}`}>{task.priority.toLowerCase()}</span><button aria-label={`Delete ${task.title}`} className="justify-self-end rounded-lg p-2 text-slate-300 hover:bg-red-50 hover:text-red-500" onClick={() => onDelete(task.id)} type="button"><Trash2 size={15} /></button></div>)}</div> : <EmptyPanel label="No tasks yet" action="Create a task" onClick={onCreate} />}</section>; }
 
-function LoadingState() { return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[1, 2, 3, 4].map((item) => <div className="h-36 animate-pulse rounded-2xl bg-white" key={item} />)}</div>; }
 function WorkspaceEmpty({ onCreate }: { onCreate: () => void }) { return <EmptyPanel label="Start with a workspace" action="Create workspace" onClick={onCreate} description="Your workspace is where projects, tasks, and teammates come together." />; }
 function EmptyPanel({ label, action, onClick, description }: { label: string; action: string; onClick?: () => void; description?: string }) { return <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[var(--saas-lilac)] text-[var(--saas-blue)]"><Sparkles size={20} /></span><h3 className="mt-4 font-bold text-[var(--saas-navy)]">{label}</h3><p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">{description || "A clear space for your next piece of work."}</p>{onClick ? <button className="mt-5 rounded-xl bg-[var(--saas-blue)] px-4 py-2.5 text-sm font-bold text-white" onClick={onClick} type="button">{action}</button> : null}</div>; }
 function EmptyInline({ label, action, onClick }: { label: string; action: string; onClick: () => void }) { return <div className="py-8 text-center"><p className="text-sm font-semibold text-slate-500">{label}</p><button className="mt-2 text-sm font-bold text-[var(--saas-blue)]" onClick={onClick} type="button">{action}</button></div>; }
